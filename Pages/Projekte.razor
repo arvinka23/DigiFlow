@@ -1,0 +1,389 @@
+@page "/projekte"
+@using System.Security.Claims
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.AspNetCore.Components.Authorization
+@using DigitalisierungsManager.Services
+@using DigitalisierungsManager.Models
+@using DigitalisierungsManager.Shared
+@attribute [Authorize]
+@inject IProjektService ProjektService
+@inject AuthenticationStateProvider AuthStateProvider
+
+<PageTitle>Projekte - DigiFlow</PageTitle>
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h1><i class="bi bi-kanban me-2"></i>Projektverwaltung</h1>
+    <button class="btn btn-success" @onclick="ShowCreateModal">
+        <i class="bi bi-plus-lg me-1"></i> Neues Projekt
+    </button>
+</div>
+
+<div class="row g-3 mb-4">
+    <div class="col-md-6">
+        <div class="input-icon-wrapper">
+            <i class="bi bi-search input-icon"></i>
+            <input type="text" class="form-control" placeholder="Projekte durchsuchen..." @bind="searchTerm" @bind:event="oninput" @onkeydown="HandleSearchKey" />
+        </div>
+    </div>
+    <div class="col-md-6 d-flex align-items-center">
+        <div class="filter-pills">
+            <button class="btn btn-sm @(selectedStatus == null ? "btn-primary" : "btn-outline-primary")"
+                    @onclick="() => FilterByStatus(null)">Alle</button>
+            @foreach (ProjektStatus status in Enum.GetValues<ProjektStatus>())
+            {
+                <button class="btn btn-sm @(selectedStatus == status ? "btn-primary" : "btn-outline-primary")"
+                        @onclick="() => FilterByStatus(status)">@StatusHelper.GetDisplayName(status)</button>
+            }
+        </div>
+    </div>
+</div>
+
+@if (isLoading)
+{
+    <div class="d-flex align-items-center gap-2 my-4">
+        <div class="spinner-border spinner-border-sm" role="status"></div>
+        <span>Projekte werden geladen...</span>
+    </div>
+}
+else if (paginatedResult != null && paginatedResult.Items.Any())
+{
+    <div class="row g-3">
+        @foreach (var projekt in paginatedResult.Items)
+        {
+            <div class="col-md-6">
+                <div class="card projekt-card">
+                    <div class="card-header">
+                        <span><i class="bi bi-folder2 me-2"></i><strong>@projekt.Titel</strong></span>
+                        <span class="badge @StatusHelper.GetBadgeClass(projekt.Status)">@StatusHelper.GetDisplayName(projekt.Status)</span>
+                    </div>
+                    <div class="card-body">
+                        <p class="card-text mb-2">@projekt.Beschreibung</p>
+                        <div class="d-flex flex-wrap gap-3 mb-0">
+                            <small><i class="bi bi-cpu me-1"></i>@projekt.Technologie</small>
+                            <small><i class="bi bi-person me-1"></i>@projekt.Verantwortlicher</small>
+                            <small><i class="bi bi-list-check me-1"></i>@projekt.Benutzeranforderungen.Count Anforderungen</small>
+                            <small><i class="bi bi-lightbulb me-1"></i>@projekt.Vorschlaege.Count Vorschlaege</small>
+                        </div>
+                    </div>
+                    <div class="card-footer d-flex gap-2">
+                        <button class="btn btn-sm btn-primary" @onclick="() => EditProjekt(projekt)">
+                            <i class="bi bi-pencil me-1"></i>Bearbeiten
+                        </button>
+                        <button class="btn btn-sm btn-danger" @onclick="() => ConfirmDelete(projekt)">
+                            <i class="bi bi-trash me-1"></i>Loeschen
+                        </button>
+                    </div>
+                </div>
+            </div>
+        }
+    </div>
+
+    @if (paginatedResult.TotalPages > 1)
+    {
+        <nav aria-label="Projektseitenwechsel" class="mt-4">
+            <div class="d-flex justify-content-between align-items-center">
+                <small class="text-muted">
+                    Zeige @((paginatedResult.Page - 1) * paginatedResult.PageSize + 1)–@(Math.Min(paginatedResult.Page * paginatedResult.PageSize, paginatedResult.TotalCount))
+                    von @paginatedResult.TotalCount Projekten
+                </small>
+                <ul class="pagination mb-0">
+                    <li class="page-item @(paginatedResult.HasPreviousPage ? "" : "disabled")">
+                        <button class="page-link" @onclick="() => GoToPage(currentPage - 1)" disabled="@(!paginatedResult.HasPreviousPage)">
+                            <i class="bi bi-chevron-left"></i>
+                        </button>
+                    </li>
+                    @for (int i = 1; i <= paginatedResult.TotalPages; i++)
+                    {
+                        var pageNum = i;
+                        <li class="page-item @(pageNum == currentPage ? "active" : "")">
+                            <button class="page-link" @onclick="() => GoToPage(pageNum)">@pageNum</button>
+                        </li>
+                    }
+                    <li class="page-item @(paginatedResult.HasNextPage ? "" : "disabled")">
+                        <button class="page-link" @onclick="() => GoToPage(currentPage + 1)" disabled="@(!paginatedResult.HasNextPage)">
+                            <i class="bi bi-chevron-right"></i>
+                        </button>
+                    </li>
+                </ul>
+            </div>
+        </nav>
+    }
+}
+else if (paginatedResult != null)
+{
+    <div class="card">
+        <div class="card-body text-center py-5" style="color: var(--text-muted);">
+            <i class="bi bi-inbox" style="font-size: 2.5rem;"></i>
+            <p class="mt-2 mb-0">Keine Projekte gefunden.</p>
+        </div>
+    </div>
+}
+
+@if (!string.IsNullOrEmpty(errorMessage))
+{
+    <div class="alert alert-danger mt-3"><i class="bi bi-exclamation-triangle me-2"></i>@errorMessage</div>
+}
+
+<!-- Create/Edit Modal -->
+@if (showModal && editingProjekt != null)
+{
+    <div class="modal show d-block" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">
+                        <i class="bi @(editingProjekt.Id > 0 ? "bi-pencil-square" : "bi-plus-circle") me-2"></i>
+                        @(editingProjekt.Id > 0 ? "Projekt bearbeiten" : "Neues Projekt")
+                    </h5>
+                    <button type="button" class="btn-close" @onclick="CloseModal"></button>
+                </div>
+                <EditForm Model="editingProjekt" OnValidSubmit="SaveProjekt">
+                    <DataAnnotationsValidator />
+                    <div class="modal-body">
+                        <ValidationSummary class="text-danger mb-3" />
+                        <div class="mb-3">
+                            <label class="form-label">Titel *</label>
+                            <InputText class="form-control" @bind-Value="editingProjekt.Titel" />
+                            <ValidationMessage For="() => editingProjekt.Titel" />
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Beschreibung</label>
+                            <InputTextArea class="form-control" rows="3" @bind-Value="editingProjekt.Beschreibung" />
+                            <ValidationMessage For="() => editingProjekt.Beschreibung" />
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Technologie</label>
+                            <InputText class="form-control" @bind-Value="editingProjekt.Technologie" placeholder="z.B. C# Blazor, PowerShell, VBA" />
+                            <ValidationMessage For="() => editingProjekt.Technologie" />
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Status</label>
+                            <InputSelect class="form-select" @bind-Value="editingProjekt.Status">
+                                @foreach (ProjektStatus status in Enum.GetValues<ProjektStatus>())
+                                {
+                                    <option value="@status">@StatusHelper.GetDisplayName(status)</option>
+                                }
+                            </InputSelect>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Verantwortlicher *</label>
+                            <InputText class="form-control" @bind-Value="editingProjekt.Verantwortlicher" />
+                            <ValidationMessage For="() => editingProjekt.Verantwortlicher" />
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" @onclick="CloseModal">
+                            <i class="bi bi-x-lg me-1"></i>Abbrechen
+                        </button>
+                        <button type="submit" class="btn btn-primary">
+                            <i class="bi bi-check-lg me-1"></i>Speichern
+                        </button>
+                    </div>
+                </EditForm>
+            </div>
+        </div>
+    </div>
+    <div class="modal-backdrop show"></div>
+}
+
+<!-- Delete Confirmation Modal -->
+@if (showDeleteConfirm && deletingProjekt != null)
+{
+    <div class="modal show d-block" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header bg-danger text-white">
+                    <h5 class="modal-title"><i class="bi bi-exclamation-triangle me-2"></i>Projekt loeschen</h5>
+                    <button type="button" class="btn-close btn-close-white" @onclick="CancelDelete"></button>
+                </div>
+                <div class="modal-body">
+                    <p>Sind Sie sicher, dass Sie das folgende Projekt unwiderruflich loeschen moechten?</p>
+                    <p><strong>@deletingProjekt.Titel</strong></p>
+                    <p class="text-muted"><small>Alle zugehoerigen Anforderungen und Vorschlaege werden ebenfalls geloescht.</small></p>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" @onclick="CancelDelete">
+                        <i class="bi bi-x-lg me-1"></i>Abbrechen
+                    </button>
+                    <button type="button" class="btn btn-danger" @onclick="ExecuteDelete">
+                        <i class="bi bi-trash me-1"></i>Endgueltig loeschen
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="modal-backdrop show"></div>
+}
+
+<Toast @bind-IsVisible="showToast" Title="@toastTitle" Message="@toastMessage" Level="@toastLevel" />
+
+@code {
+    private PaginatedResult<Projekt>? paginatedResult;
+    private ProjektStatus? selectedStatus;
+    private string searchTerm = string.Empty;
+    private bool showModal = false;
+    private bool isLoading = true;
+    private string errorMessage = string.Empty;
+    private Projekt? editingProjekt;
+    private string currentUserId = string.Empty;
+
+    private int currentPage = 1;
+    private const int PageSize = 6;
+
+    private bool showDeleteConfirm = false;
+    private Projekt? deletingProjekt;
+
+    private bool showToast = false;
+    private string toastTitle = string.Empty;
+    private string toastMessage = string.Empty;
+    private ToastLevel toastLevel = ToastLevel.Info;
+
+    protected override async Task OnInitializedAsync()
+    {
+        currentUserId = await GetUserIdAsync();
+        await LoadProjekte();
+    }
+
+    private async Task LoadProjekte()
+    {
+        isLoading = true;
+        errorMessage = string.Empty;
+        try
+        {
+            paginatedResult = await ProjektService.GetProjektePaginatedAsync(
+                currentUserId, currentPage, PageSize, selectedStatus,
+                string.IsNullOrWhiteSpace(searchTerm) ? null : searchTerm);
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Fehler beim Laden der Projekte: {ex.Message}";
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private async Task GoToPage(int page)
+    {
+        if (page < 1 || (paginatedResult != null && page > paginatedResult.TotalPages)) return;
+        currentPage = page;
+        await LoadProjekte();
+    }
+
+    private async Task HandleSearchKey(Microsoft.AspNetCore.Components.Web.KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter")
+            await Search();
+    }
+
+    private async Task Search()
+    {
+        currentPage = 1;
+        await LoadProjekte();
+    }
+
+    private async Task FilterByStatus(ProjektStatus? status)
+    {
+        selectedStatus = status;
+        currentPage = 1;
+        await LoadProjekte();
+    }
+
+    private void ShowCreateModal()
+    {
+        editingProjekt = new Projekt();
+        showModal = true;
+    }
+
+    private void EditProjekt(Projekt projekt)
+    {
+        editingProjekt = new Projekt
+        {
+            Id = projekt.Id,
+            Titel = projekt.Titel,
+            Beschreibung = projekt.Beschreibung,
+            Technologie = projekt.Technologie,
+            Status = projekt.Status,
+            Verantwortlicher = projekt.Verantwortlicher
+        };
+        showModal = true;
+    }
+
+    private void CloseModal()
+    {
+        showModal = false;
+        editingProjekt = null;
+    }
+
+    private async Task SaveProjekt()
+    {
+        if (editingProjekt == null) return;
+
+        try
+        {
+            if (editingProjekt.Id == 0)
+            {
+                await ProjektService.CreateProjektAsync(editingProjekt, currentUserId);
+                ShowToast("Erfolg", "Projekt erfolgreich erstellt.", ToastLevel.Success);
+            }
+            else
+            {
+                await ProjektService.UpdateProjektAsync(editingProjekt, currentUserId);
+                ShowToast("Erfolg", "Projekt erfolgreich aktualisiert.", ToastLevel.Success);
+            }
+
+            CloseModal();
+            await LoadProjekte();
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Fehler beim Speichern: {ex.Message}";
+        }
+    }
+
+    private void ConfirmDelete(Projekt projekt)
+    {
+        deletingProjekt = projekt;
+        showDeleteConfirm = true;
+    }
+
+    private void CancelDelete()
+    {
+        deletingProjekt = null;
+        showDeleteConfirm = false;
+    }
+
+    private async Task ExecuteDelete()
+    {
+        if (deletingProjekt == null) return;
+
+        try
+        {
+            var title = deletingProjekt.Titel;
+            await ProjektService.DeleteProjektAsync(deletingProjekt.Id, currentUserId);
+            CancelDelete();
+            ShowToast("Geloescht", $"Projekt \"{title}\" wurde geloescht.", ToastLevel.Success);
+            await LoadProjekte();
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Fehler beim Loeschen: {ex.Message}";
+            CancelDelete();
+        }
+    }
+
+    private void ShowToast(string title, string message, ToastLevel level)
+    {
+        toastTitle = title;
+        toastMessage = message;
+        toastLevel = level;
+        showToast = true;
+    }
+
+    private async Task<string> GetUserIdAsync()
+    {
+        var authState = await AuthStateProvider.GetAuthenticationStateAsync();
+        return authState.User.FindFirstValue(ClaimTypes.NameIdentifier) ?? "";
+    }
+}

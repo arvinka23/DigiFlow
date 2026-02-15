@@ -1,0 +1,68 @@
+@inherits LayoutComponentBase
+
+<div class="page">
+    <aside class="sidebar">
+        <div class="sidebar-brand">
+            <div class="brand-icon">
+                <i class="bi bi-lightning-charge-fill"></i>
+            </div>
+            <span class="brand-text">DigiFlow</span>
+        </div>
+        <NavMenu />
+        <div class="sidebar-bottom">
+            <AuthorizeView>
+                <Authorized Context="authContext">
+                    <AuthorizeView Roles="Admin">
+                        <Authorized Context="adminContext">
+                            <span class="badge bg-warning sidebar-badge">Admin</span>
+                        </Authorized>
+                    </AuthorizeView>
+                </Authorized>
+            </AuthorizeView>
+        </div>
+    </aside>
+
+    <div class="main-area">
+        <header class="top-row">
+            <div></div>
+            <div class="user-area">
+                <AuthorizeView>
+                    <Authorized Context="authContext">
+                        <span class="user-email">@authContext.User.Identity?.Name</span>
+                        <a href="/Identity/Logout" class="btn-logout" title="Abmelden">
+                            Abmelden
+                        </a>
+                    </Authorized>
+                </AuthorizeView>
+            </div>
+        </header>
+
+        <main>
+            <article class="content">
+                <ErrorBoundary @ref="errorBoundary">
+                    <ChildContent>
+                        @Body
+                    </ChildContent>
+                    <ErrorContent Context="ex">
+                        <div class="alert alert-danger mt-4">
+                            <h4><i class="bi bi-exclamation-triangle me-2"></i>Ein unerwarteter Fehler ist aufgetreten</h4>
+                            <p>Bitte laden Sie die Seite neu oder versuchen Sie es spaeter erneut.</p>
+                            <button class="btn btn-outline-danger btn-sm" @onclick="ResetError">
+                                <i class="bi bi-arrow-clockwise me-1"></i>Erneut versuchen
+                            </button>
+                        </div>
+                    </ErrorContent>
+                </ErrorBoundary>
+            </article>
+        </main>
+    </div>
+</div>
+
+@code {
+    private ErrorBoundary? errorBoundary;
+
+    private void ResetError()
+    {
+        errorBoundary?.Recover();
+    }
+}

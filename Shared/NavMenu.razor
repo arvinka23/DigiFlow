@@ -1,0 +1,22 @@
+<nav class="sidebar-nav">
+    <NavLink class="sidebar-link" href="" Match="NavLinkMatch.All">
+        <i class="bi bi-house"></i>
+        <span>Home</span>
+    </NavLink>
+    <NavLink class="sidebar-link" href="projekte">
+        <i class="bi bi-kanban"></i>
+        <span>Projekte</span>
+    </NavLink>
+    <NavLink class="sidebar-link" href="datenaustausch">
+        <i class="bi bi-arrow-left-right"></i>
+        <span>Datenaustausch</span>
+    </NavLink>
+    <AuthorizeView Roles="Admin">
+        <Authorized>
+            <NavLink class="sidebar-link" href="sql-query">
+                <i class="bi bi-database"></i>
+                <span>SQL Abfragen</span>
+            </NavLink>
+        </Authorized>
+    </AuthorizeView>
+</nav>

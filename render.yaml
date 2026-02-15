@@ -1,0 +1,11 @@
+services:
+  - type: web
+    name: digiflow
+    runtime: docker
+    plan: free
+    envVars:
+      - key: ASPNETCORE_URLS
+        value: http://+:8080
+    autoDeploy: true
+    healthCheckPath: /
+

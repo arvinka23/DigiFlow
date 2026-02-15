@@ -1,0 +1,148 @@
+@page "/"
+@page "/home"
+@using System.Security.Claims
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.AspNetCore.Components.Authorization
+@using DigitalisierungsManager.Services
+@using DigitalisierungsManager.Models
+@using DigitalisierungsManager.Shared
+@attribute [Authorize]
+@inject IProjektService ProjektService
+@inject AuthenticationStateProvider AuthStateProvider
+
+<PageTitle>Home - DigiFlow</PageTitle>
+
+@if (isLoading)
+{
+    <div class="d-flex align-items-center gap-2 my-5">
+        <div class="spinner-border spinner-border-sm" role="status"></div>
+        <span>Dashboard wird geladen...</span>
+    </div>
+}
+else if (!string.IsNullOrEmpty(errorMessage))
+{
+    <div class="alert alert-danger mt-4"><i class="bi bi-exclamation-triangle me-2"></i>@errorMessage</div>
+}
+else if (projekte != null)
+{
+    <div class="row g-3 mb-4">
+        <div class="col-md-3 col-sm-6">
+            <div class="stat-card">
+                <div class="stat-icon blue">
+                    <i class="bi bi-folder2-open"></i>
+                </div>
+                <div class="stat-info">
+                    <div class="stat-value">@totalCount</div>
+                    <div class="stat-label">Projekte</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3 col-sm-6">
+            <div class="stat-card">
+                <div class="stat-icon green">
+                    <i class="bi bi-check-circle"></i>
+                </div>
+                <div class="stat-info">
+                    <div class="stat-value">@projekte.Count(p => p.Status == ProjektStatus.Abgeschlossen)</div>
+                    <div class="stat-label">Abgeschlossen</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3 col-sm-6">
+            <div class="stat-card">
+                <div class="stat-icon amber">
+                    <i class="bi bi-gear"></i>
+                </div>
+                <div class="stat-info">
+                    <div class="stat-value">@projekte.Count(p => p.Status == ProjektStatus.InBearbeitung)</div>
+                    <div class="stat-label">In Bearbeitung</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3 col-sm-6">
+            <div class="stat-card">
+                <div class="stat-icon cyan">
+                    <i class="bi bi-clock-history"></i>
+                </div>
+                <div class="stat-info">
+                    <div class="stat-value">@projekte.Count(p => p.Status == ProjektStatus.Geplant)</div>
+                    <div class="stat-label">Geplant</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <h5 class="mb-3" style="color: var(--text-muted); font-weight: 500;">Alle Projekte</h5>
+
+    @if (projekte.Any())
+    {
+        <div class="dashboard-table">
+            <div class="table-responsive">
+                <table class="table mb-0">
+                    <thead>
+                        <tr>
+                            <th>Titel</th>
+                            <th>Beschreibung</th>
+                            <th>Technologie</th>
+                            <th>Status</th>
+                            <th>Verantwortlicher</th>
+                            <th>Erstellt</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var projekt in projekte)
+                        {
+                            <tr>
+                                <td><strong>@projekt.Titel</strong></td>
+                                <td style="max-width: 250px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">@projekt.Beschreibung</td>
+                                <td>@projekt.Technologie</td>
+                                <td><span class="badge @StatusHelper.GetBadgeClass(projekt.Status)">@StatusHelper.GetDisplayName(projekt.Status)</span></td>
+                                <td>@projekt.Verantwortlicher</td>
+                                <td>@projekt.ErstelltAm.ToLocalTime().ToString("dd.MM.yyyy")</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    }
+    else
+    {
+        <div class="dashboard-table p-5 text-center" style="color: var(--text-muted);">
+            <i class="bi bi-inbox" style="font-size: 2rem;"></i>
+            <p class="mt-2 mb-0">Noch keine Projekte vorhanden. Erstellen Sie Ihr erstes Projekt unter <a href="/projekte">Projekte</a>.</p>
+        </div>
+    }
+}
+
+@code {
+    private List<Projekt>? projekte;
+    private int totalCount;
+    private bool isLoading = true;
+    private string errorMessage = string.Empty;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            var userId = await GetUserIdAsync();
+            var result = await ProjektService.GetProjektePaginatedAsync(userId, 1, int.MaxValue);
+            projekte = result.Items;
+            totalCount = result.TotalCount;
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Fehler beim Laden des Dashboards: {ex.Message}";
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private async Task<string> GetUserIdAsync()
+    {
+        var authState = await AuthStateProvider.GetAuthenticationStateAsync();
+        return authState.User.FindFirstValue(ClaimTypes.NameIdentifier) ?? "";
+    }
+}

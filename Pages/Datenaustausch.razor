@@ -1,0 +1,259 @@
+@page "/datenaustausch"
+@using System.Security.Claims
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.AspNetCore.Components.Authorization
+@using DigitalisierungsManager.Services
+@using DigitalisierungsManager.Models
+@using DigitalisierungsManager.Shared
+@attribute [Authorize]
+@inject IProjektService ProjektService
+@inject IDataExchangeService DataExchangeService
+@inject AuthenticationStateProvider AuthStateProvider
+@inject IJSRuntime JS
+
+<PageTitle>Datenaustausch - DigiFlow</PageTitle>
+
+<h1><i class="bi bi-arrow-left-right me-2"></i>Datenaustausch</h1>
+
+<div class="welcome-section mb-4">
+    <h5 class="mb-1"><i class="bi bi-info-circle me-2"></i>Export & Import</h5>
+    <p>Exportieren Sie Ihre Projektdaten in verschiedenen Formaten (JSON, CSV, XML) und importieren Sie Daten aus externen Quellen.</p>
+</div>
+
+@if (isLoading)
+{
+    <div class="d-flex align-items-center gap-2 my-4">
+        <div class="spinner-border spinner-border-sm" role="status"></div>
+        <span>Daten werden geladen...</span>
+    </div>
+}
+else
+{
+    <div class="row g-4">
+        <div class="col-md-6">
+            <div class="card exchange-card h-100">
+                <div class="card-header d-flex align-items-center gap-2">
+                    <i class="bi bi-cloud-download"></i>
+                    <span>Export</span>
+                </div>
+                <div class="card-body">
+                    <p class="card-text mb-3">Exportieren Sie Ihre Projekte in verschiedenen Formaten:</p>
+                    <div class="d-flex flex-column gap-2">
+                        <button class="btn btn-primary exchange-btn" @onclick="ExportJson" disabled="@isExporting">
+                            <i class="bi bi-filetype-json"></i> JSON Export
+                        </button>
+                        <button class="btn btn-success exchange-btn" @onclick="ExportCsv" disabled="@isExporting">
+                            <i class="bi bi-filetype-csv"></i> CSV Export
+                        </button>
+                        <button class="btn btn-info exchange-btn" @onclick="ExportXml" disabled="@isExporting">
+                            <i class="bi bi-filetype-xml"></i> XML Export
+                        </button>
+                    </div>
+                    @if (isExporting)
+                    {
+                        <div class="d-flex align-items-center gap-2 mt-3">
+                            <div class="spinner-border spinner-border-sm" role="status"></div>
+                            <span>Export wird erstellt...</span>
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-6">
+            <div class="card exchange-card h-100">
+                <div class="card-header d-flex align-items-center gap-2">
+                    <i class="bi bi-cloud-upload"></i>
+                    <span>Import</span>
+                </div>
+                <div class="card-body">
+                    <p class="card-text mb-3">Importieren Sie Projektdaten aus Dateien:</p>
+                    <div class="mb-3">
+                        <label class="form-label"><i class="bi bi-filetype-json me-1"></i>JSON Datei</label>
+                        <div class="file-drop-zone">
+                            <i class="bi bi-cloud-arrow-up drop-icon"></i>
+                            <div class="drop-text">Datei hierher ziehen oder klicken</div>
+                            <InputFile OnChange="ImportJsonFile" class="form-control" accept=".json" />
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label"><i class="bi bi-filetype-csv me-1"></i>CSV Datei</label>
+                        <div class="file-drop-zone">
+                            <i class="bi bi-cloud-arrow-up drop-icon"></i>
+                            <div class="drop-text">Datei hierher ziehen oder klicken</div>
+                            <InputFile OnChange="ImportCsvFile" class="form-control" accept=".csv" />
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@if (!string.IsNullOrEmpty(errorMessage))
+{
+    <div class="alert alert-danger mt-4"><i class="bi bi-exclamation-triangle me-2"></i>@errorMessage</div>
+}
+
+<Toast @bind-IsVisible="showToast" Title="@toastTitle" Message="@toastMessage" Level="@toastLevel" />
+
+@code {
+    private List<Projekt>? projekte;
+    private string currentUserId = string.Empty;
+    private bool isLoading = true;
+    private bool isExporting = false;
+    private string errorMessage = string.Empty;
+
+    private bool showToast = false;
+    private string toastTitle = string.Empty;
+    private string toastMessage = string.Empty;
+    private ToastLevel toastLevel = ToastLevel.Info;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            currentUserId = await GetUserIdAsync();
+            projekte = await ProjektService.GetAllProjekteAsync(currentUserId);
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Fehler beim Laden: {ex.Message}";
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private async Task ExportJson()
+    {
+        if (projekte == null) return;
+        isExporting = true;
+        try
+        {
+            var json = DataExchangeService.ExportProjekteToJson(projekte);
+            await JS.InvokeVoidAsync("downloadFileFromText", "projekte.json", json, "application/json");
+            ShowToast("Export", "JSON-Export erfolgreich heruntergeladen.", ToastLevel.Success);
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Fehler beim JSON-Export: {ex.Message}";
+        }
+        finally
+        {
+            isExporting = false;
+        }
+    }
+
+    private async Task ExportCsv()
+    {
+        if (projekte == null) return;
+        isExporting = true;
+        try
+        {
+            var csvBytes = DataExchangeService.ExportProjekteToCsv(projekte);
+            var csvText = System.Text.Encoding.UTF8.GetString(csvBytes);
+            await JS.InvokeVoidAsync("downloadFileFromText", "projekte.csv", csvText, "text/csv");
+            ShowToast("Export", "CSV-Export erfolgreich heruntergeladen.", ToastLevel.Success);
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Fehler beim CSV-Export: {ex.Message}";
+        }
+        finally
+        {
+            isExporting = false;
+        }
+    }
+
+    private async Task ExportXml()
+    {
+        if (projekte == null) return;
+        isExporting = true;
+        try
+        {
+            var xml = DataExchangeService.ExportToXml(projekte);
+            await JS.InvokeVoidAsync("downloadFileFromText", "projekte.xml", xml, "application/xml");
+            ShowToast("Export", "XML-Export erfolgreich heruntergeladen.", ToastLevel.Success);
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Fehler beim XML-Export: {ex.Message}";
+        }
+        finally
+        {
+            isExporting = false;
+        }
+    }
+
+    private async Task ImportJsonFile(InputFileChangeEventArgs e)
+    {
+        errorMessage = string.Empty;
+        try
+        {
+            using var stream = e.File.OpenReadStream(maxAllowedSize: 10485760);
+            using var reader = new StreamReader(stream);
+            var jsonContent = await reader.ReadToEndAsync();
+            
+            var importedProjekte = DataExchangeService.ImportProjekteFromJson(jsonContent);
+
+            if (importedProjekte.Count == 0)
+            {
+                ShowToast("Import", "Keine Projekte in der Datei gefunden.", ToastLevel.Warning);
+                return;
+            }
+
+            await ProjektService.CreateProjekteBatchAsync(importedProjekte, currentUserId);
+            
+            ShowToast("Import", $"Erfolgreich {importedProjekte.Count} Projekt(e) importiert!", ToastLevel.Success);
+            projekte = await ProjektService.GetAllProjekteAsync(currentUserId);
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Fehler beim JSON-Import: {ex.Message}";
+            ShowToast("Fehler", "JSON-Import fehlgeschlagen.", ToastLevel.Error);
+        }
+    }
+
+    private async Task ImportCsvFile(InputFileChangeEventArgs e)
+    {
+        errorMessage = string.Empty;
+        try
+        {
+            using var stream = e.File.OpenReadStream(maxAllowedSize: 10485760);
+            
+            var importedProjekte = await DataExchangeService.ImportProjekteFromCsvAsync(stream);
+
+            if (importedProjekte.Count == 0)
+            {
+                ShowToast("Import", "Keine Projekte in der CSV-Datei gefunden.", ToastLevel.Warning);
+                return;
+            }
+
+            await ProjektService.CreateProjekteBatchAsync(importedProjekte, currentUserId);
+            
+            ShowToast("Import", $"Erfolgreich {importedProjekte.Count} Projekt(e) aus CSV importiert!", ToastLevel.Success);
+            projekte = await ProjektService.GetAllProjekteAsync(currentUserId);
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Fehler beim CSV-Import: {ex.Message}";
+            ShowToast("Fehler", "CSV-Import fehlgeschlagen.", ToastLevel.Error);
+        }
+    }
+
+    private void ShowToast(string title, string message, ToastLevel level)
+    {
+        toastTitle = title;
+        toastMessage = message;
+        toastLevel = level;
+        showToast = true;
+    }
+
+    private async Task<string> GetUserIdAsync()
+    {
+        var authState = await AuthStateProvider.GetAuthenticationStateAsync();
+        return authState.User.FindFirstValue(ClaimTypes.NameIdentifier) ?? "";
+    }
+}

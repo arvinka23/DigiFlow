@@ -1,0 +1,78 @@
+@if (IsVisible)
+{
+    <div class="toast-container position-fixed bottom-0 end-0 p-3" style="z-index: 1080;">
+        <div class="toast show" role="alert" style="border-left: 3px solid @AccentColor;">
+            <div class="toast-header @HeaderClass">
+                <i class="@IconClass me-2"></i>
+                <strong class="me-auto">@Title</strong>
+                <button type="button" class="btn-close btn-close-white" @onclick="Close"></button>
+            </div>
+            <div class="toast-body">
+                @Message
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private System.Timers.Timer? _timer;
+
+    [Parameter] public string Title { get; set; } = "Info";
+    [Parameter] public string Message { get; set; } = string.Empty;
+    [Parameter] public ToastLevel Level { get; set; } = ToastLevel.Info;
+    [Parameter] public bool IsVisible { get; set; } = false;
+    [Parameter] public EventCallback<bool> IsVisibleChanged { get; set; }
+    [Parameter] public int AutoHideMs { get; set; } = 4000;
+
+    private string HeaderClass => Level switch
+    {
+        ToastLevel.Success => "bg-success text-white",
+        ToastLevel.Error => "bg-danger text-white",
+        ToastLevel.Warning => "bg-warning text-dark",
+        _ => "bg-info text-white"
+    };
+
+    private string IconClass => Level switch
+    {
+        ToastLevel.Success => "bi bi-check-circle-fill",
+        ToastLevel.Error => "bi bi-exclamation-triangle-fill",
+        ToastLevel.Warning => "bi bi-exclamation-circle-fill",
+        _ => "bi bi-info-circle-fill"
+    };
+
+    private string AccentColor => Level switch
+    {
+        ToastLevel.Success => "#22c55e",
+        ToastLevel.Error => "#ef4444",
+        ToastLevel.Warning => "#f59e0b",
+        _ => "#06b6d4"
+    };
+
+    protected override void OnParametersSet()
+    {
+        if (IsVisible && AutoHideMs > 0)
+        {
+            _timer?.Dispose();
+            _timer = new System.Timers.Timer(AutoHideMs);
+            _timer.Elapsed += async (_, _) =>
+            {
+                _timer?.Dispose();
+                await InvokeAsync(Close);
+            };
+            _timer.AutoReset = false;
+            _timer.Start();
+        }
+    }
+
+    private async Task Close()
+    {
+        IsVisible = false;
+        await IsVisibleChanged.InvokeAsync(false);
+        StateHasChanged();
+    }
+
+    public void Dispose()
+    {
+        _timer?.Dispose();
+    }
+}

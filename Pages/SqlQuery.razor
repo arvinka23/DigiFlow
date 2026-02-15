@@ -1,0 +1,144 @@
+@page "/sql-query"
+@using Microsoft.AspNetCore.Authorization
+@using DigitalisierungsManager.Services
+@attribute [Authorize(Roles = "Admin")]
+@inject ISqlQueryService SqlQueryService
+
+<PageTitle>SQL Abfragen - DigiFlow</PageTitle>
+
+<h1><i class="bi bi-database me-2"></i>SQL Query Interface</h1>
+
+<div class="welcome-section mb-4">
+    <h5 class="mb-1"><i class="bi bi-shield-lock me-2"></i>Nur Lesezugriff</h5>
+    <p>Fuehren Sie schreibgeschuetzte SELECT-Abfragen auf der Datenbank aus. Datenmodifizierende Operationen (INSERT, UPDATE, DELETE etc.) sind aus Sicherheitsgruenden blockiert.</p>
+</div>
+
+<div class="card mb-4">
+    <div class="card-header d-flex align-items-center gap-2">
+        <i class="bi bi-code-square"></i>
+        <span>SQL Abfrage (SELECT)</span>
+    </div>
+    <div class="card-body">
+        <div class="mb-3">
+            <label class="form-label">SQL SELECT Query</label>
+            <textarea class="sql-editor w-100" rows="8" @bind="sqlQuery" placeholder="SELECT * FROM Projekte WHERE Status = 'InBearbeitung'"></textarea>
+        </div>
+        <div class="d-flex gap-2">
+            <button class="btn btn-primary" @onclick="ExecuteQuery" disabled="@isLoading">
+                <i class="bi bi-play-fill me-1"></i>Abfrage ausfuehren
+            </button>
+            <button class="btn btn-secondary" @onclick="LoadExampleQuery">
+                <i class="bi bi-file-earmark-code me-1"></i>Beispiel laden
+            </button>
+        </div>
+    </div>
+</div>
+
+@if (isLoading)
+{
+    <div class="d-flex align-items-center gap-2 my-4">
+        <div class="spinner-border spinner-border-sm" role="status"></div>
+        <span>Abfrage wird ausgefuehrt...</span>
+    </div>
+}
+
+@if (queryResults != null && queryResults.Any())
+{
+    <div class="card mb-4">
+        <div class="card-header d-flex align-items-center gap-2">
+            <i class="bi bi-table"></i>
+            <span>Ergebnisse (@queryResults.Count Zeilen@(queryResults.Count >= 1000 ? " - Limit erreicht" : ""))</span>
+        </div>
+        <div class="card-body p-0">
+            <div class="table-responsive" style="max-height: 500px; overflow: auto;">
+                <table class="table table-striped table-sm mb-0">
+                    <thead>
+                        <tr>
+                            @if (queryResults.Any())
+                            {
+                                @foreach (var key in queryResults[0].Keys)
+                                {
+                                    <th>@key</th>
+                                }
+                            }
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var row in queryResults)
+                        {
+                            <tr>
+                                @foreach (var value in row.Values)
+                                {
+                                    <td style="font-family: 'JetBrains Mono', 'Consolas', monospace; font-size: 0.85rem;">@(value?.ToString() ?? "NULL")</td>
+                                }
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+}
+
+@if (!string.IsNullOrEmpty(successMessage))
+{
+    <div class="alert alert-success"><i class="bi bi-check-circle me-2"></i>@successMessage</div>
+}
+
+@if (!string.IsNullOrEmpty(errorMessage))
+{
+    <div class="alert alert-danger"><i class="bi bi-exclamation-triangle me-2"></i><strong>Fehler:</strong> @errorMessage</div>
+}
+
+@code {
+    private string sqlQuery = string.Empty;
+    private List<Dictionary<string, object>>? queryResults;
+    private string errorMessage = string.Empty;
+    private string successMessage = string.Empty;
+    private bool isLoading = false;
+
+    private void LoadExampleQuery()
+    {
+        sqlQuery = @"SELECT 
+    p.Id,
+    p.Titel,
+    p.Status,
+    p.Technologie,
+    COUNT(DISTINCT b.Id) AS AnzahlAnforderungen,
+    COUNT(DISTINCT v.Id) AS AnzahlVorschlaege
+FROM Projekte p
+LEFT JOIN Benutzeranforderungen b ON p.Id = b.ProjektId
+LEFT JOIN DigitalisierungsVorschlaege v ON p.Id = v.ProjektId
+GROUP BY p.Id, p.Titel, p.Status, p.Technologie
+ORDER BY p.ErstelltAm DESC";
+    }
+
+    private async Task ExecuteQuery()
+    {
+        if (string.IsNullOrWhiteSpace(sqlQuery))
+            return;
+
+        isLoading = true;
+        errorMessage = string.Empty;
+        successMessage = string.Empty;
+        queryResults = null;
+
+        try
+        {
+            queryResults = await SqlQueryService.ExecuteReadOnlyQueryAsync(sqlQuery);
+            successMessage = $"Abfrage erfolgreich. {queryResults.Count} Zeile(n) zurueckgegeben.";
+        }
+        catch (InvalidOperationException ex)
+        {
+            errorMessage = ex.Message;
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"SQL Fehler: {ex.Message}";
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+}
