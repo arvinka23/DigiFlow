@@ -1,0 +1,144 @@
+@page "/reports"
+@using System.Security.Claims
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.AspNetCore.Components.Authorization
+@using DigitalisierungsManager.Services.Reports
+@using DigitalisierungsManager.Services.Health
+@using DigitalisierungsManager.Models
+@using DigitalisierungsManager.Shared
+@attribute [Authorize]
+@inject IWeeklyReportService ReportService
+@inject AuthenticationStateProvider AuthStateProvider
+@inject IJSRuntime JS
+
+<PageTitle>Wochenreport - DigiFlow</PageTitle>
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+        <h1><i class="bi bi-file-earmark-text me-2"></i>Wochenreport</h1>
+        <p class="text-muted mb-0">Automatisch generierte Management-&Uuml;bersicht &uuml;ber die letzten 7 Tage.</p>
+    </div>
+    <div class="d-flex gap-2">
+        <button class="btn btn-primary" @onclick="Generate" disabled="@isLoading">
+            @if (isLoading)
+            {
+                <span class="spinner-border spinner-border-sm me-2"></span>
+                <span>Generiere...</span>
+            }
+            else
+            {
+                <i class="bi bi-arrow-clockwise me-1"></i>
+                <span>Neu erzeugen</span>
+            }
+        </button>
+        @if (report != null)
+        {
+            <button class="btn btn-success" @onclick="DownloadMarkdown">
+                <i class="bi bi-download me-1"></i>Markdown
+            </button>
+        }
+    </div>
+</div>
+
+@if (!string.IsNullOrEmpty(errorMessage))
+{
+    <div class="alert alert-danger"><i class="bi bi-exclamation-triangle me-2"></i>@errorMessage</div>
+}
+
+@if (report != null)
+{
+    <div class="row g-3 mb-4">
+        <div class="col-md-3 col-sm-6">
+            <div class="stat-card">
+                <div class="stat-icon blue"><i class="bi bi-folder"></i></div>
+                <div class="stat-info">
+                    <div class="stat-value">@report.Data.GesamtProjekte</div>
+                    <div class="stat-label">Projekte gesamt</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3 col-sm-6">
+            <div class="stat-card">
+                <div class="stat-icon cyan"><i class="bi bi-plus-circle"></i></div>
+                <div class="stat-info">
+                    <div class="stat-value">@report.Data.NeueProjekte</div>
+                    <div class="stat-label">Neu diese Woche</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3 col-sm-6">
+            <div class="stat-card">
+                <div class="stat-icon green"><i class="bi bi-check-circle"></i></div>
+                <div class="stat-info">
+                    <div class="stat-value">@report.Data.Abgeschlossene</div>
+                    <div class="stat-label">Abgeschlossen</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3 col-sm-6">
+            <div class="stat-card">
+                <div class="stat-icon amber"><i class="bi bi-heart-pulse"></i></div>
+                <div class="stat-info">
+                    <div class="stat-value">@report.Data.DurchschnittScore / 100</div>
+                    <div class="stat-label">&Oslash; Health-Score</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="card mb-4">
+        <div class="card-header">Executive Summary &amp; Details</div>
+        <div class="card-body">
+            <pre style="white-space:pre-wrap; font-family:inherit; margin:0;">@report.Markdown</pre>
+        </div>
+    </div>
+}
+else if (!isLoading)
+{
+    <div class="card">
+        <div class="card-body text-center py-5 text-muted">
+            <i class="bi bi-file-earmark-text" style="font-size:2rem;"></i>
+            <p class="mt-2 mb-0">Noch kein Report generiert. Klicke <strong>Neu erzeugen</strong>.</p>
+        </div>
+    </div>
+}
+
+@code {
+    private WeeklyReportResult? report;
+    private bool isLoading;
+    private string errorMessage = string.Empty;
+
+    protected override async Task OnInitializedAsync() => await Generate();
+
+    private async Task Generate()
+    {
+        isLoading = true;
+        errorMessage = string.Empty;
+        try
+        {
+            var userId = await GetUserIdAsync();
+            report = await ReportService.GenerateAsync(userId);
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Report-Generierung fehlgeschlagen: {ex.Message}";
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private async Task DownloadMarkdown()
+    {
+        if (report == null) return;
+        var name = $"digiflow-wochenreport-{DateTime.UtcNow:yyyyMMdd}.md";
+        await JS.InvokeVoidAsync("downloadFileFromText", name, report.Markdown, "text/markdown");
+    }
+
+    private async Task<string> GetUserIdAsync()
+    {
+        var auth = await AuthStateProvider.GetAuthenticationStateAsync();
+        return auth.User.FindFirstValue(ClaimTypes.NameIdentifier) ?? "";
+    }
+}
