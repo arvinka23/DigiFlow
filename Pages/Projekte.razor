@@ -4,11 +4,13 @@
 @using Microsoft.AspNetCore.Components.Authorization
 @using DigitalisierungsManager.Services
 @using DigitalisierungsManager.Services.Health
+@using DigitalisierungsManager.Services.Search
 @using DigitalisierungsManager.Models
 @using DigitalisierungsManager.Shared
 @attribute [Authorize]
 @inject IProjektService ProjektService
 @inject IHealthScoreService HealthService
+@inject ISemanticSearchService SemanticSearch
 @inject AuthenticationStateProvider AuthStateProvider
 
 <PageTitle>Projekte - DigiFlow</PageTitle>
@@ -29,10 +31,20 @@
     <div class="col-md-6">
         <div class="input-icon-wrapper">
             <i class="bi bi-search input-icon"></i>
-            <input type="text" class="form-control" placeholder="Projekte durchsuchen..." @bind="searchTerm" @bind:event="oninput" @onkeydown="HandleSearchKey" />
+            <input type="text" class="form-control" placeholder="@(smartSearch ? "Smart-Suche: auch Synonyme und Tippfehler..." : "Projekte durchsuchen...")" @bind="searchTerm" @bind:event="oninput" @onkeydown="HandleSearchKey" />
         </div>
     </div>
-    <div class="col-md-6 d-flex align-items-center">
+    <div class="col-md-3 d-flex align-items-center">
+        <div class="filter-pills">
+            <button class="btn btn-sm @(!smartSearch ? "btn-primary" : "btn-outline-primary")" @onclick="() => ToggleSearchMode(false)" title="Einfacher Textvergleich">
+                <i class="bi bi-type me-1"></i>Keyword
+            </button>
+            <button class="btn btn-sm @(smartSearch ? "btn-primary" : "btn-outline-primary")" @onclick="() => ToggleSearchMode(true)" title="Synonyme + Fuzzy-Match">
+                <i class="bi bi-stars me-1"></i>Smart
+            </button>
+        </div>
+    </div>
+    <div class="col-md-3 d-flex align-items-center">
         <div class="filter-pills">
             <button class="btn btn-sm @(selectedStatus == null ? "btn-primary" : "btn-outline-primary")"
                     @onclick="() => FilterByStatus(null)">Alle</button>
@@ -51,6 +63,63 @@
         <div class="spinner-border spinner-border-sm" role="status"></div>
         <span>Projekte werden geladen...</span>
     </div>
+}
+else if (smartSearch && !string.IsNullOrWhiteSpace(searchTerm))
+{
+    @if (semanticResults == null || !semanticResults.Any())
+    {
+        <div class="card"><div class="card-body text-center py-5 text-muted">
+            <i class="bi bi-search" style="font-size:2rem;"></i>
+            <p class="mt-2 mb-0">Keine semantischen Treffer fuer &bdquo;@searchTerm&ldquo;.</p>
+        </div></div>
+    }
+    else
+    {
+        <small class="text-muted d-block mb-2">@semanticResults.Count Treffer &middot; sortiert nach Relevanz</small>
+        <div class="row g-3">
+            @foreach (var hit in semanticResults)
+            {
+                var projekt = hit.Projekt;
+                var relevance = (int)Math.Round(hit.Score * 100);
+                <div class="col-md-6">
+                    <div class="card projekt-card">
+                        <div class="card-header">
+                            <span><i class="bi bi-folder2 me-2"></i><strong>@projekt.Titel</strong></span>
+                            <div class="d-flex gap-2 align-items-center">
+                                <span class="badge bg-primary" title="Relevanz">@relevance&thinsp;%</span>
+                                <span class="badge @StatusHelper.GetBadgeClass(projekt.Status)">@StatusHelper.GetDisplayName(projekt.Status)</span>
+                            </div>
+                        </div>
+                        <div class="card-body">
+                            <div class="d-flex gap-3 align-items-start">
+                                <HealthRing Assessment="HealthService.Evaluate(projekt)" Size="48" />
+                                <div class="flex-grow-1">
+                                    <p class="card-text mb-2">@projekt.Beschreibung</p>
+                                    @if (hit.MatchedTerms.Any())
+                                    {
+                                        <div class="d-flex flex-wrap gap-1 mb-2">
+                                            @foreach (var t in hit.MatchedTerms.Take(6))
+                                            {
+                                                <span class="badge bg-secondary">@t</span>
+                                            }
+                                        </div>
+                                    }
+                                    <div class="d-flex flex-wrap gap-3 mb-0">
+                                        <small><i class="bi bi-cpu me-1"></i>@projekt.Technologie</small>
+                                        <small><i class="bi bi-person me-1"></i>@projekt.Verantwortlicher</small>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="card-footer d-flex gap-2">
+                            <button class="btn btn-sm btn-primary" @onclick="() => EditProjekt(projekt)"><i class="bi bi-pencil me-1"></i>Bearbeiten</button>
+                            <button class="btn btn-sm btn-secondary" @onclick="() => ShowHealth(projekt)"><i class="bi bi-heart-pulse me-1"></i>Gesundheit</button>
+                        </div>
+                    </div>
+                </div>
+            }
+        </div>
+    }
 }
 else if (paginatedResult != null && paginatedResult.Items.Any())
 {
@@ -314,6 +383,26 @@ else if (paginatedResult != null)
     private Projekt? healthProjekt;
     private HealthAssessment? healthAssessment;
 
+    private bool smartSearch;
+    private List<ScoredProjekt>? semanticResults;
+
+    private async Task ToggleSearchMode(bool enableSmart)
+    {
+        smartSearch = enableSmart;
+        if (enableSmart) await RunSemanticSearch();
+        else semanticResults = null;
+    }
+
+    private async Task RunSemanticSearch()
+    {
+        if (string.IsNullOrWhiteSpace(searchTerm))
+        {
+            semanticResults = new();
+            return;
+        }
+        semanticResults = await SemanticSearch.SearchAsync(searchTerm, currentUserId);
+    }
+
     private void ShowHealth(Projekt p)
     {
         healthProjekt = p;
@@ -368,7 +457,8 @@ else if (paginatedResult != null)
     private async Task Search()
     {
         currentPage = 1;
-        await LoadProjekte();
+        if (smartSearch) await RunSemanticSearch();
+        else await LoadProjekte();
     }
 
     private async Task FilterByStatus(ProjektStatus? status)
