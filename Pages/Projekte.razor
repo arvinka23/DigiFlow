@@ -3,10 +3,12 @@
 @using Microsoft.AspNetCore.Authorization
 @using Microsoft.AspNetCore.Components.Authorization
 @using DigitalisierungsManager.Services
+@using DigitalisierungsManager.Services.Health
 @using DigitalisierungsManager.Models
 @using DigitalisierungsManager.Shared
 @attribute [Authorize]
 @inject IProjektService ProjektService
+@inject IHealthScoreService HealthService
 @inject AuthenticationStateProvider AuthStateProvider
 
 <PageTitle>Projekte - DigiFlow</PageTitle>
@@ -62,17 +64,25 @@ else if (paginatedResult != null && paginatedResult.Items.Any())
                         <span class="badge @StatusHelper.GetBadgeClass(projekt.Status)">@StatusHelper.GetDisplayName(projekt.Status)</span>
                     </div>
                     <div class="card-body">
-                        <p class="card-text mb-2">@projekt.Beschreibung</p>
-                        <div class="d-flex flex-wrap gap-3 mb-0">
-                            <small><i class="bi bi-cpu me-1"></i>@projekt.Technologie</small>
-                            <small><i class="bi bi-person me-1"></i>@projekt.Verantwortlicher</small>
-                            <small><i class="bi bi-list-check me-1"></i>@projekt.Benutzeranforderungen.Count Anforderungen</small>
-                            <small><i class="bi bi-lightbulb me-1"></i>@projekt.Vorschlaege.Count Vorschlaege</small>
+                        <div class="d-flex gap-3 align-items-start">
+                            <HealthRing Assessment="HealthService.Evaluate(projekt)" Size="48" />
+                            <div class="flex-grow-1">
+                                <p class="card-text mb-2">@projekt.Beschreibung</p>
+                                <div class="d-flex flex-wrap gap-3 mb-0">
+                                    <small><i class="bi bi-cpu me-1"></i>@projekt.Technologie</small>
+                                    <small><i class="bi bi-person me-1"></i>@projekt.Verantwortlicher</small>
+                                    <small><i class="bi bi-list-check me-1"></i>@projekt.Benutzeranforderungen.Count Anforderungen</small>
+                                    <small><i class="bi bi-lightbulb me-1"></i>@projekt.Vorschlaege.Count Vorschlaege</small>
+                                </div>
+                            </div>
                         </div>
                     </div>
                     <div class="card-footer d-flex gap-2">
                         <button class="btn btn-sm btn-primary" @onclick="() => EditProjekt(projekt)">
                             <i class="bi bi-pencil me-1"></i>Bearbeiten
+                        </button>
+                        <button class="btn btn-sm btn-secondary" @onclick="() => ShowHealth(projekt)">
+                            <i class="bi bi-heart-pulse me-1"></i>Gesundheit
                         </button>
                         <button class="btn btn-sm btn-danger" @onclick="() => ConfirmDelete(projekt)">
                             <i class="bi bi-trash me-1"></i>Loeschen
@@ -220,6 +230,64 @@ else if (paginatedResult != null)
     <div class="modal-backdrop show"></div>
 }
 
+<!-- Health Details Modal -->
+@if (healthProjekt != null && healthAssessment != null)
+{
+    <div class="modal show d-block" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title"><i class="bi bi-heart-pulse me-2"></i>Gesundheits-Analyse: @healthProjekt.Titel</h5>
+                    <button type="button" class="btn-close" @onclick="CloseHealth"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="d-flex align-items-center gap-3 mb-3">
+                        <HealthRing Assessment="healthAssessment" Size="72" />
+                        <div>
+                            <div style="font-size:22px; font-weight:600;">@healthAssessment.Level</div>
+                            <small class="text-muted">Score @healthAssessment.Score / 100 &middot; @healthAssessment.Findings.Count Befund(e)</small>
+                        </div>
+                    </div>
+                    @if (!healthAssessment.Findings.Any())
+                    {
+                        <div class="alert alert-success">
+                            <i class="bi bi-check-circle me-2"></i>Keine Auffaelligkeiten. Dieses Projekt ist gesund.
+                        </div>
+                    }
+                    else
+                    {
+                        <ul class="health-findings">
+                            @foreach (var f in healthAssessment.Findings.OrderByDescending(x => x.Severity))
+                            {
+                                var dotClass = f.Severity switch
+                                {
+                                    HealthSeverity.Info => "info",
+                                    HealthSeverity.Warnung => "warn",
+                                    _ => "crit"
+                                };
+                                <li>
+                                    <div class="finding-head">
+                                        <span class="severity-dot @dotClass"></span>
+                                        <strong>@f.Category</strong>
+                                        <span class="badge bg-secondary">@f.Severity</span>
+                                        <span class="ms-auto text-muted" style="font-size:12px">@f.ScoreImpact Pkt</span>
+                                    </div>
+                                    <div>@f.Message</div>
+                                    <div class="finding-rec"><i class="bi bi-lightbulb me-1"></i>@f.Recommendation</div>
+                                </li>
+                            }
+                        </ul>
+                    }
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-secondary" @onclick="CloseHealth">Schliessen</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="modal-backdrop show"></div>
+}
+
 <Toast @bind-IsVisible="showToast" Title="@toastTitle" Message="@toastMessage" Level="@toastLevel" />
 
 @code {
@@ -242,6 +310,21 @@ else if (paginatedResult != null)
     private string toastTitle = string.Empty;
     private string toastMessage = string.Empty;
     private ToastLevel toastLevel = ToastLevel.Info;
+
+    private Projekt? healthProjekt;
+    private HealthAssessment? healthAssessment;
+
+    private void ShowHealth(Projekt p)
+    {
+        healthProjekt = p;
+        healthAssessment = HealthService.Evaluate(p);
+    }
+
+    private void CloseHealth()
+    {
+        healthProjekt = null;
+        healthAssessment = null;
+    }
 
     protected override async Task OnInitializedAsync()
     {

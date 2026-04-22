@@ -4,10 +4,12 @@
 @using Microsoft.AspNetCore.Authorization
 @using Microsoft.AspNetCore.Components.Authorization
 @using DigitalisierungsManager.Services
+@using DigitalisierungsManager.Services.Health
 @using DigitalisierungsManager.Models
 @using DigitalisierungsManager.Shared
 @attribute [Authorize]
 @inject IProjektService ProjektService
+@inject IHealthScoreService HealthService
 @inject AuthenticationStateProvider AuthStateProvider
 
 <PageTitle>Home - DigiFlow</PageTitle>
@@ -72,6 +74,30 @@ else if (projekte != null)
         </div>
     </div>
 
+    @if (healthAssessments != null && healthAssessments.Any())
+    {
+        <div class="row g-3 mb-4">
+            <div class="col-md-6">
+                <div class="stat-card">
+                    <div class="stat-icon green"><i class="bi bi-heart-pulse"></i></div>
+                    <div class="stat-info">
+                        <div class="stat-value">@averageScore / 100</div>
+                        <div class="stat-label">Durchschnittlicher Health-Score</div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="stat-card">
+                    <div class="stat-icon amber"><i class="bi bi-exclamation-triangle"></i></div>
+                    <div class="stat-info">
+                        <div class="stat-value">@criticalCount</div>
+                        <div class="stat-label">Projekte mit Handlungsbedarf (&lt; 60)</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    }
+
     <h5 class="mb-3" style="color: var(--text-muted); font-weight: 500;">Alle Projekte</h5>
 
     @if (projekte.Any())
@@ -120,6 +146,9 @@ else if (projekte != null)
     private int totalCount;
     private bool isLoading = true;
     private string errorMessage = string.Empty;
+    private List<HealthAssessment>? healthAssessments;
+    private int averageScore;
+    private int criticalCount;
 
     protected override async Task OnInitializedAsync()
     {
@@ -129,6 +158,13 @@ else if (projekte != null)
             var result = await ProjektService.GetProjektePaginatedAsync(userId, 1, int.MaxValue);
             projekte = result.Items;
             totalCount = result.TotalCount;
+
+            healthAssessments = projekte.Select(HealthService.Evaluate).ToList();
+            if (healthAssessments.Any())
+            {
+                averageScore = (int)Math.Round(healthAssessments.Average(a => a.Score));
+                criticalCount = healthAssessments.Count(a => a.Score < 60);
+            }
         }
         catch (Exception ex)
         {
