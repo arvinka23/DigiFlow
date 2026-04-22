@@ -70,12 +70,12 @@ else if (smartSearch && !string.IsNullOrWhiteSpace(searchTerm))
     {
         <div class="card"><div class="card-body text-center py-5 text-muted">
             <i class="bi bi-search" style="font-size:2rem;"></i>
-            <p class="mt-2 mb-0">Keine semantischen Treffer fuer &bdquo;@searchTerm&ldquo;.</p>
+            <p class="mt-2 mb-0">Keine semantischen Treffer für „@searchTerm".</p>
         </div></div>
     }
     else
     {
-        <small class="text-muted d-block mb-2">@semanticResults.Count Treffer &middot; sortiert nach Relevanz</small>
+        <small class="text-muted d-block mb-2">@semanticResults.Count Treffer · sortiert nach Relevanz</small>
         <div class="row g-3">
             @foreach (var hit in semanticResults)
             {
@@ -86,7 +86,7 @@ else if (smartSearch && !string.IsNullOrWhiteSpace(searchTerm))
                         <div class="card-header">
                             <span><i class="bi bi-folder2 me-2"></i><strong>@projekt.Titel</strong></span>
                             <div class="d-flex gap-2 align-items-center">
-                                <span class="badge bg-primary" title="Relevanz">@relevance&thinsp;%</span>
+                                <span class="badge bg-primary" title="Relevanz">@relevance %</span>
                                 <span class="badge @StatusHelper.GetBadgeClass(projekt.Status)">@StatusHelper.GetDisplayName(projekt.Status)</span>
                             </div>
                         </div>
@@ -314,7 +314,7 @@ else if (paginatedResult != null)
                         <HealthRing Assessment="healthAssessment" Size="72" />
                         <div>
                             <div style="font-size:22px; font-weight:600;">@healthAssessment.Level</div>
-                            <small class="text-muted">Score @healthAssessment.Score / 100 &middot; @healthAssessment.Findings.Count Befund(e)</small>
+                            <small class="text-muted">Score @healthAssessment.Score / 100 · @healthAssessment.Findings.Count Befund(e)</small>
                         </div>
                     </div>
                     @if (!healthAssessment.Findings.Any())
