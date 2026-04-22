@@ -176,7 +176,7 @@ internal static class ProcessTemplateLibrary
         new ProcessTemplate
         {
             Name = "Excel-Ersatz",
-            Keywords = new[] { "excel", "tabelle", "liste", "xlsx", "access", "manuell" },
+            Keywords = new[] { "excel", "tabelle", "xlsx", "access", "spreadsheet" },
             TitelTemplate = "Excel-Liste durch zentrale Datenbank ersetzen",
             Technologie = "Webformular + SQL + Rollen/Rechte",
             Anforderungen = new()
