@@ -117,7 +117,7 @@ public class WeeklyReportService : IWeeklyReportService
             sb.AppendLine();
             foreach (var p in d.Hervorhebungen)
             {
-                sb.AppendLine($"- **{p.Titel}** ({p.Status}) &ndash; {p.Verantwortlicher}");
+                sb.AppendLine($"- **{p.Titel}** ({p.Status}) – {p.Verantwortlicher}");
             }
             sb.AppendLine();
         }
@@ -147,10 +147,10 @@ public class WeeklyReportService : IWeeklyReportService
 
         parts.Add(d.DurchschnittScore switch
         {
-            >= 80 => $"Der durchschnittliche Health-Score liegt bei {d.DurchschnittScore}/100 &ndash; das Portfolio ist insgesamt gesund.",
-            >= 60 => $"Der durchschnittliche Health-Score liegt bei {d.DurchschnittScore}/100 &ndash; Portfolio stabil, einzelne Projekte sollten beobachtet werden.",
-            >= 40 => $"Der durchschnittliche Health-Score liegt bei {d.DurchschnittScore}/100 &ndash; mehrere Projekte brauchen Aufmerksamkeit.",
-            _     => $"Der durchschnittliche Health-Score liegt bei {d.DurchschnittScore}/100 &ndash; deutlicher Handlungsbedarf im Portfolio."
+            >= 80 => $"Der durchschnittliche Health-Score liegt bei {d.DurchschnittScore}/100 – das Portfolio ist insgesamt gesund.",
+            >= 60 => $"Der durchschnittliche Health-Score liegt bei {d.DurchschnittScore}/100 – Portfolio stabil, einzelne Projekte sollten beobachtet werden.",
+            >= 40 => $"Der durchschnittliche Health-Score liegt bei {d.DurchschnittScore}/100 – mehrere Projekte brauchen Aufmerksamkeit.",
+            _     => $"Der durchschnittliche Health-Score liegt bei {d.DurchschnittScore}/100 – deutlicher Handlungsbedarf im Portfolio."
         });
 
         if (d.Handlungsbedarf.Count > 0)
