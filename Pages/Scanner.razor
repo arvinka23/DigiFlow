@@ -17,7 +17,7 @@
 <div class="d-flex justify-content-between align-items-center mb-4">
     <div>
         <h1><i class="bi bi-stars me-2"></i>Opportunity Scanner</h1>
-        <p class="text-muted mb-0">Beschreibe einen manuellen Prozess &mdash; erhalte einen fertigen Projekt-Entwurf inkl. Anforderungen, Vorschl&auml;gen, ROI und Risiken.</p>
+        <p class="text-muted mb-0">Beschreibe einen manuellen Prozess — erhalte einen fertigen Projekt-Entwurf inkl. Anforderungen, Vorschlägen, ROI und Risiken.</p>
     </div>
 </div>
 
@@ -40,8 +40,8 @@
             </div>
 
             <div class="mb-3">
-                <label class="form-label">Prozessbeschreibung <span class="text-muted">(z.B. "Wir f&uuml;hren jede Rechnung per Hand in Excel ein")</span></label>
-                <textarea class="form-control" rows="5" @bind="input" @bind:event="oninput" placeholder="Beschreibe in 1-3 S&auml;tzen, was heute manuell abl&auml;uft..."></textarea>
+                <label class="form-label">Prozessbeschreibung <span class="text-muted">(z.B. "Wir führen jede Rechnung per Hand in Excel ein")</span></label>
+                <textarea class="form-control" rows="5" @bind="input" @bind:event="oninput" placeholder="Beschreibe in 1-3 Sätzen, was heute manuell abläuft..."></textarea>
                 <small class="text-muted">@input.Length / 1000 Zeichen</small>
             </div>
 
@@ -51,7 +51,7 @@
             </div>
 
             <div class="d-flex justify-content-between align-items-center">
-                <small class="text-muted"><i class="bi bi-shield-check me-1"></i>Analyse l&auml;uft lokal &mdash; keine Daten verlassen den Server.</small>
+                <small class="text-muted"><i class="bi bi-shield-check me-1"></i>Analyse läuft lokal — keine Daten verlassen den Server.</small>
                 <button class="btn btn-primary" @onclick="Analyze" disabled="@(isAnalyzing || string.IsNullOrWhiteSpace(input))">
                     @if (isAnalyzing)
                     {
@@ -74,8 +74,8 @@ else
         <i class="bi bi-stars"></i>
         <div>
             Vorschlag basierend auf Template <strong>@draft.MatchedTemplateName</strong>
-            &nbsp;&middot;&nbsp; Konfidenz <strong>@((int)(draft.Confidence * 100))&thinsp;%</strong>
-            &nbsp;&middot;&nbsp; Alle Felder k&ouml;nnen vor dem Speichern editiert werden.
+            &nbsp;· Konfidenz <strong>@((int)(draft.Confidence * 100)) %</strong>
+            &nbsp;· Alle Felder können vor dem Speichern editiert werden.
         </div>
     </div>
 
@@ -108,7 +108,7 @@ else
 
         <div class="col-md-4">
             <div class="card h-100">
-                <div class="card-header"><i class="bi bi-graph-up-arrow me-2"></i>ROI-Sch&auml;tzung</div>
+                <div class="card-header"><i class="bi bi-graph-up-arrow me-2"></i>ROI-Schätzung</div>
                 <div class="card-body">
                     <div class="stat-card mb-2" style="padding:12px">
                         <div class="stat-icon green"><i class="bi bi-cash-coin"></i></div>
@@ -158,7 +158,7 @@ else
                             <select class="form-select form-select-sm" @bind="a.Prioritaet">
                                 @foreach (Prioritaet p in Enum.GetValues<Prioritaet>())
                                 {
-                                    <option value="@p">Priorit&auml;t: @p</option>
+                                    <option value="@p">Priorität: @p</option>
                                 }
                             </select>
                         </div>
@@ -170,7 +170,7 @@ else
         <div class="col-md-6">
             <div class="card h-100">
                 <div class="card-header d-flex justify-content-between align-items-center">
-                    <span><i class="bi bi-lightbulb me-2"></i>Vorschl&auml;ge (@draft.Vorschlaege.Count)</span>
+                    <span><i class="bi bi-lightbulb me-2"></i>Vorschläge (@draft.Vorschlaege.Count)</span>
                     <button class="btn btn-sm btn-outline-primary" @onclick="AddVorschlag"><i class="bi bi-plus"></i></button>
                 </div>
                 <div class="card-body">
@@ -259,10 +259,10 @@ else
     private static readonly Example[] Examples =
     {
         new("Rechnungseingang", "Wir bekommen jeden Tag 20-30 Papier-Rechnungen per Post und geben sie manuell in Excel ein, bevor die Buchhaltung sie bucht."),
-        new("Urlaubsantrag", "Urlaubsantr&auml;ge laufen heute per Papierformular; der Vorgesetzte unterschreibt und HR pflegt die Abwesenheit manuell in eine Liste."),
+        new("Urlaubsantrag", "Urlaubsanträge laufen heute per Papierformular; der Vorgesetzte unterschreibt und HR pflegt die Abwesenheit manuell in eine Liste."),
         new("Onboarding", "Beim Eintritt eines neuen Mitarbeiters werden manuell Tickets an IT, Facility und HR verschickt; das dauert oft 2 Wochen."),
-        new("Spesen", "Aussendienstmitarbeiter reichen Papierquittungen ein; eine Assistenz tippt Beleg f&uuml;r Beleg in Excel ab."),
-        new("Kundenanfragen", "Anfragen kommen per E-Mail und Telefon; Vertrieb pflegt sie manuell in einer Excel-Liste, was oft zu doppelter Bearbeitung f&uuml;hrt."),
+        new("Spesen", "Aussendienstmitarbeiter reichen Papierquittungen ein; eine Assistenz tippt Beleg für Beleg in Excel ab."),
+        new("Kundenanfragen", "Anfragen kommen per E-Mail und Telefon; Vertrieb pflegt sie manuell in einer Excel-Liste, was oft zu doppelter Bearbeitung führt."),
     };
 
     private string input = string.Empty;
