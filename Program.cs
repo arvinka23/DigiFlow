@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore;
 using DigitalisierungsManager.Data;
 using DigitalisierungsManager.Models;
 using DigitalisierungsManager.Services;
+using DigitalisierungsManager.Services.Ai;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -58,6 +59,18 @@ builder.Services.ConfigureApplicationCookie(options =>
 builder.Services.AddScoped<IProjektService, ProjektService>();
 builder.Services.AddScoped<IDataExchangeService, DataExchangeService>();
 builder.Services.AddScoped<ISqlQueryService, SqlQueryService>();
+
+// AI Provider (optional, Default "None" = 0 Kosten, keine externen Calls)
+builder.Services.Configure<AiOptions>(builder.Configuration.GetSection(AiOptions.SectionName));
+var aiProvider = builder.Configuration.GetValue<string>($"{AiOptions.SectionName}:Provider") ?? "None";
+if (string.Equals(aiProvider, "Ollama", StringComparison.OrdinalIgnoreCase))
+{
+    builder.Services.AddHttpClient<IAiClient, OllamaAiClient>();
+}
+else
+{
+    builder.Services.AddSingleton<IAiClient, NullAiClient>();
+}
 
 var app = builder.Build();
 
