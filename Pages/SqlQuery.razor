@@ -1,8 +1,10 @@
 @page "/sql-query"
 @using Microsoft.AspNetCore.Authorization
 @using DigitalisierungsManager.Services
+@using DigitalisierungsManager.Services.QueryBuilder
 @attribute [Authorize(Roles = "Admin")]
 @inject ISqlQueryService SqlQueryService
+@inject IQueryBuilderService QueryBuilder
 
 <PageTitle>SQL Abfragen - DigiFlow</PageTitle>
 
@@ -11,6 +13,109 @@
 <div class="welcome-section mb-4">
     <h5 class="mb-1"><i class="bi bi-shield-lock me-2"></i>Nur Lesezugriff</h5>
     <p>Fuehren Sie schreibgeschuetzte SELECT-Abfragen auf der Datenbank aus. Datenmodifizierende Operationen (INSERT, UPDATE, DELETE etc.) sind aus Sicherheitsgruenden blockiert.</p>
+</div>
+
+<div class="card mb-3">
+    <div class="card-header d-flex align-items-center gap-2">
+        <i class="bi bi-collection"></i>
+        <span>Vorgefertigte Abfragen</span>
+    </div>
+    <div class="card-body">
+        <div class="d-flex flex-wrap gap-2">
+            @foreach (var preset in QueryPresets.All)
+            {
+                <button class="btn btn-sm btn-outline-primary" title="@preset.Description" @onclick="() => UsePreset(preset)">
+                    @preset.Name
+                </button>
+            }
+        </div>
+    </div>
+</div>
+
+<div class="card mb-3">
+    <div class="card-header d-flex align-items-center gap-2">
+        <i class="bi bi-sliders"></i>
+        <span>Query-Builder</span>
+        <small class="text-muted ms-auto">Zusammenklicken statt tippen</small>
+    </div>
+    <div class="card-body">
+        <div class="row g-2 mb-2">
+            <div class="col-md-4">
+                <label class="form-label">Tabelle</label>
+                <select class="form-select form-select-sm" @bind="builderTable">
+                    @foreach (var t in QueryBuilderService.Schema.Keys)
+                    {
+                        <option value="@t">@t</option>
+                    }
+                </select>
+            </div>
+            <div class="col-md-4">
+                <label class="form-label">Sortieren nach</label>
+                <select class="form-select form-select-sm" @bind="builderOrderBy">
+                    <option value="">(keine)</option>
+                    @foreach (var c in AvailableColumns)
+                    {
+                        <option value="@c">@c</option>
+                    }
+                </select>
+            </div>
+            <div class="col-md-2">
+                <label class="form-label">Richtung</label>
+                <select class="form-select form-select-sm" @bind="builderOrderDesc">
+                    <option value="true">DESC</option>
+                    <option value="false">ASC</option>
+                </select>
+            </div>
+            <div class="col-md-2">
+                <label class="form-label">Limit</label>
+                <input type="number" class="form-control form-control-sm" @bind="builderLimit" min="1" max="1000" />
+            </div>
+        </div>
+
+        <div class="mb-2">
+            <label class="form-label d-flex justify-content-between align-items-center">
+                <span>Filter</span>
+                <button class="btn btn-sm btn-outline-primary" @onclick="AddFilter"><i class="bi bi-plus"></i> Filter</button>
+            </label>
+            @for (int i = 0; i < builderFilters.Count; i++)
+            {
+                var idx = i;
+                var f = builderFilters[idx];
+                <div class="row g-2 mb-2">
+                    <div class="col-md-4">
+                        <select class="form-select form-select-sm" @bind="f.Column">
+                            <option value="">Spalte...</option>
+                            @foreach (var c in AvailableColumns)
+                            {
+                                <option value="@c">@c</option>
+                            }
+                        </select>
+                    </div>
+                    <div class="col-md-3">
+                        <select class="form-select form-select-sm" @bind="f.Operator">
+                            @foreach (var op in QueryBuilderService.Operators)
+                            {
+                                <option value="@op">@op</option>
+                            }
+                        </select>
+                    </div>
+                    <div class="col-md-4">
+                        <input class="form-control form-control-sm" placeholder="Wert" @bind="f.Value"
+                               disabled="@(f.Operator == "IS NULL" || f.Operator == "IS NOT NULL")" />
+                    </div>
+                    <div class="col-md-1">
+                        <button class="btn btn-sm btn-danger w-100" @onclick="() => builderFilters.RemoveAt(idx)"><i class="bi bi-x"></i></button>
+                    </div>
+                </div>
+            }
+        </div>
+
+        <div class="d-flex gap-2">
+            <button class="btn btn-sm btn-primary" @onclick="GenerateFromBuilder">
+                <i class="bi bi-magic me-1"></i>SQL generieren
+            </button>
+        </div>
+    </div>
 </div>
 
 <div class="card mb-4">
@@ -96,6 +201,40 @@
     private string errorMessage = string.Empty;
     private string successMessage = string.Empty;
     private bool isLoading = false;
+
+    private string builderTable = "Projekte";
+    private string builderOrderBy = "";
+    private bool builderOrderDesc = true;
+    private int builderLimit = 100;
+    private List<FilterClause> builderFilters = new();
+
+    private IEnumerable<string> AvailableColumns =>
+        QueryBuilderService.Schema.TryGetValue(builderTable, out var cols) ? cols : Array.Empty<string>();
+
+    private void AddFilter() => builderFilters.Add(new FilterClause { Operator = "=" });
+
+    private void UsePreset(QueryPreset preset) => sqlQuery = preset.Sql;
+
+    private void GenerateFromBuilder()
+    {
+        try
+        {
+            var req = new QueryBuilderRequest
+            {
+                Table = builderTable,
+                Filters = builderFilters.Where(f => !string.IsNullOrWhiteSpace(f.Column)).ToList(),
+                OrderByColumn = string.IsNullOrWhiteSpace(builderOrderBy) ? null : builderOrderBy,
+                OrderDescending = builderOrderDesc,
+                Limit = builderLimit
+            };
+            sqlQuery = QueryBuilder.BuildSql(req);
+            errorMessage = string.Empty;
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Query-Builder Fehler: {ex.Message}";
+        }
+    }
 
     private void LoadExampleQuery()
     {
