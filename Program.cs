@@ -6,6 +6,7 @@ using DigitalisierungsManager.Services;
 using DigitalisierungsManager.Services.Ai;
 using DigitalisierungsManager.Services.Scanner;
 using DigitalisierungsManager.Services.QueryBuilder;
+using DigitalisierungsManager.Services.Health;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -64,6 +65,7 @@ builder.Services.AddScoped<ISqlQueryService, SqlQueryService>();
 
 builder.Services.AddScoped<IOpportunityScannerService, OpportunityScannerService>();
 builder.Services.AddSingleton<IQueryBuilderService, QueryBuilderService>();
+builder.Services.AddSingleton<IHealthScoreService, HealthScoreService>();
 
 // AI Provider (optional, Default "None" = 0 Kosten, keine externen Calls)
 builder.Services.Configure<AiOptions>(builder.Configuration.GetSection(AiOptions.SectionName));
