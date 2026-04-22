@@ -34,12 +34,25 @@ public static class SynonymDictionary
 
     private static readonly Dictionary<string, HashSet<string>> Index = BuildIndex();
 
-    /// <summary>Gibt alle Synonyme zum gegebenen Wort zurueck (inkl. Eingabewort).</summary>
+    /// <summary>
+    /// Gibt alle Synonyme zum gegebenen Wort zurueck. Matcht auch Composita
+    /// (z.B. "Rechnungsworkflow" -> "rechnung") per Substring-Vergleich.
+    /// </summary>
     public static IReadOnlyCollection<string> Expand(string term)
     {
         if (string.IsNullOrWhiteSpace(term)) return Array.Empty<string>();
         var key = term.Trim().ToLowerInvariant();
-        return Index.TryGetValue(key, out var set) ? set : new HashSet<string> { key };
+
+        if (Index.TryGetValue(key, out var exact))
+            return exact;
+
+        foreach (var kv in Index)
+        {
+            if (kv.Key.Length >= 4 && key.Contains(kv.Key))
+                return kv.Value;
+        }
+
+        return new HashSet<string> { key };
     }
 
     private static Dictionary<string, HashSet<string>> BuildIndex()
