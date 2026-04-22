@@ -4,6 +4,7 @@ using DigitalisierungsManager.Data;
 using DigitalisierungsManager.Models;
 using DigitalisierungsManager.Services;
 using DigitalisierungsManager.Services.Ai;
+using DigitalisierungsManager.Services.Scanner;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -59,6 +60,8 @@ builder.Services.ConfigureApplicationCookie(options =>
 builder.Services.AddScoped<IProjektService, ProjektService>();
 builder.Services.AddScoped<IDataExchangeService, DataExchangeService>();
 builder.Services.AddScoped<ISqlQueryService, SqlQueryService>();
+
+builder.Services.AddScoped<IOpportunityScannerService, OpportunityScannerService>();
 
 // AI Provider (optional, Default "None" = 0 Kosten, keine externen Calls)
 builder.Services.Configure<AiOptions>(builder.Configuration.GetSection(AiOptions.SectionName));

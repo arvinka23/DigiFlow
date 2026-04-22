@@ -1,0 +1,365 @@
+@page "/scanner"
+@using System.Security.Claims
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.AspNetCore.Components.Authorization
+@using DigitalisierungsManager.Services
+@using DigitalisierungsManager.Services.Scanner
+@using DigitalisierungsManager.Models
+@using DigitalisierungsManager.Shared
+@attribute [Authorize]
+@inject IOpportunityScannerService ScannerService
+@inject IProjektService ProjektService
+@inject AuthenticationStateProvider AuthStateProvider
+@inject NavigationManager Navigation
+
+<PageTitle>Opportunity Scanner - DigiFlow</PageTitle>
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+        <h1><i class="bi bi-stars me-2"></i>Opportunity Scanner</h1>
+        <p class="text-muted mb-0">Beschreibe einen manuellen Prozess &mdash; erhalte einen fertigen Projekt-Entwurf inkl. Anforderungen, Vorschl&auml;gen, ROI und Risiken.</p>
+    </div>
+</div>
+
+@if (draft == null)
+{
+    <div class="card">
+        <div class="card-header d-flex align-items-center gap-2">
+            <i class="bi bi-pencil-square"></i>
+            <span>Prozess beschreiben</span>
+        </div>
+        <div class="card-body">
+            <div class="mb-3">
+                <label class="form-label">Beispiele zum Einstieg:</label>
+                <div class="d-flex flex-wrap gap-2">
+                    @foreach (var example in Examples)
+                    {
+                        <button class="btn btn-sm btn-outline-primary" @onclick="() => UseExample(example)">@example.Label</button>
+                    }
+                </div>
+            </div>
+
+            <div class="mb-3">
+                <label class="form-label">Prozessbeschreibung <span class="text-muted">(z.B. "Wir f&uuml;hren jede Rechnung per Hand in Excel ein")</span></label>
+                <textarea class="form-control" rows="5" @bind="input" @bind:event="oninput" placeholder="Beschreibe in 1-3 S&auml;tzen, was heute manuell abl&auml;uft..."></textarea>
+                <small class="text-muted">@input.Length / 1000 Zeichen</small>
+            </div>
+
+            <div class="mb-3">
+                <label class="form-label">Verantwortlicher</label>
+                <input class="form-control" @bind="verantwortlicher" placeholder="z.B. IT-Team, HR, Finanzabteilung" />
+            </div>
+
+            <div class="d-flex justify-content-between align-items-center">
+                <small class="text-muted"><i class="bi bi-shield-check me-1"></i>Analyse l&auml;uft lokal &mdash; keine Daten verlassen den Server.</small>
+                <button class="btn btn-primary" @onclick="Analyze" disabled="@(isAnalyzing || string.IsNullOrWhiteSpace(input))">
+                    @if (isAnalyzing)
+                    {
+                        <span class="spinner-border spinner-border-sm me-2"></span>
+                        <span>Analysiere...</span>
+                    }
+                    else
+                    {
+                        <i class="bi bi-lightning-charge me-1"></i>
+                        <span>Prozess analysieren</span>
+                    }
+                </button>
+            </div>
+        </div>
+    </div>
+}
+else
+{
+    <div class="alert alert-info d-flex align-items-center gap-2">
+        <i class="bi bi-stars"></i>
+        <div>
+            Vorschlag basierend auf Template <strong>@draft.MatchedTemplateName</strong>
+            &nbsp;&middot;&nbsp; Konfidenz <strong>@((int)(draft.Confidence * 100))&thinsp;%</strong>
+            &nbsp;&middot;&nbsp; Alle Felder k&ouml;nnen vor dem Speichern editiert werden.
+        </div>
+    </div>
+
+    <div class="row g-3 mb-3">
+        <div class="col-md-8">
+            <div class="card">
+                <div class="card-header">Projekt-Eckdaten</div>
+                <div class="card-body">
+                    <div class="mb-3">
+                        <label class="form-label">Titel</label>
+                        <input class="form-control" @bind="draft.Titel" />
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Beschreibung</label>
+                        <textarea class="form-control" rows="3" @bind="draft.Beschreibung"></textarea>
+                    </div>
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label">Technologie</label>
+                            <input class="form-control" @bind="draft.Technologie" />
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Verantwortlicher</label>
+                            <input class="form-control" @bind="draft.Verantwortlicher" />
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-4">
+            <div class="card h-100">
+                <div class="card-header"><i class="bi bi-graph-up-arrow me-2"></i>ROI-Sch&auml;tzung</div>
+                <div class="card-body">
+                    <div class="stat-card mb-2" style="padding:12px">
+                        <div class="stat-icon green"><i class="bi bi-cash-coin"></i></div>
+                        <div class="stat-info">
+                            <div class="stat-value">@draft.Roi.JaehrlicheErsparnisEuro.ToString("N0") &euro;</div>
+                            <div class="stat-label">Ersparnis p.a.</div>
+                        </div>
+                    </div>
+                    <div class="stat-card mb-2" style="padding:12px">
+                        <div class="stat-icon amber"><i class="bi bi-tools"></i></div>
+                        <div class="stat-info">
+                            <div class="stat-value">@draft.Roi.EinmaligerAufwandEuro.ToString("N0") &euro;</div>
+                            <div class="stat-label">Einmaliger Aufwand</div>
+                        </div>
+                    </div>
+                    <div class="stat-card" style="padding:12px">
+                        <div class="stat-icon blue"><i class="bi bi-hourglass-split"></i></div>
+                        <div class="stat-info">
+                            <div class="stat-value">@draft.Roi.AmortisationMonate Mon.</div>
+                            <div class="stat-label">Amortisation</div>
+                        </div>
+                    </div>
+                    <small class="text-muted d-block mt-3">@draft.Roi.Begruendung</small>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row g-3 mb-3">
+        <div class="col-md-6">
+            <div class="card h-100">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <span><i class="bi bi-list-check me-2"></i>Anforderungen (@draft.Anforderungen.Count)</span>
+                    <button class="btn btn-sm btn-outline-primary" @onclick="AddAnforderung"><i class="bi bi-plus"></i></button>
+                </div>
+                <div class="card-body">
+                    @for (int i = 0; i < draft.Anforderungen.Count; i++)
+                    {
+                        var idx = i;
+                        var a = draft.Anforderungen[idx];
+                        <div class="mb-3 p-3" style="border:1px solid var(--border-color); border-radius:var(--radius-sm)">
+                            <div class="d-flex justify-content-between align-items-start mb-2 gap-2">
+                                <input class="form-control form-control-sm" @bind="a.Titel" />
+                                <button class="btn btn-sm btn-danger" @onclick="() => draft.Anforderungen.RemoveAt(idx)"><i class="bi bi-trash"></i></button>
+                            </div>
+                            <textarea class="form-control form-control-sm mb-2" rows="2" @bind="a.Beschreibung"></textarea>
+                            <select class="form-select form-select-sm" @bind="a.Prioritaet">
+                                @foreach (Prioritaet p in Enum.GetValues<Prioritaet>())
+                                {
+                                    <option value="@p">Priorit&auml;t: @p</option>
+                                }
+                            </select>
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-6">
+            <div class="card h-100">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <span><i class="bi bi-lightbulb me-2"></i>Vorschl&auml;ge (@draft.Vorschlaege.Count)</span>
+                    <button class="btn btn-sm btn-outline-primary" @onclick="AddVorschlag"><i class="bi bi-plus"></i></button>
+                </div>
+                <div class="card-body">
+                    @for (int i = 0; i < draft.Vorschlaege.Count; i++)
+                    {
+                        var idx = i;
+                        var v = draft.Vorschlaege[idx];
+                        <div class="mb-3 p-3" style="border:1px solid var(--border-color); border-radius:var(--radius-sm)">
+                            <div class="d-flex justify-content-between align-items-start mb-2 gap-2">
+                                <input class="form-control form-control-sm" @bind="v.Titel" />
+                                <button class="btn btn-sm btn-danger" @onclick="() => draft.Vorschlaege.RemoveAt(idx)"><i class="bi bi-trash"></i></button>
+                            </div>
+                            <textarea class="form-control form-control-sm mb-2" rows="2" @bind="v.Beschreibung"></textarea>
+                            <div class="row g-2 mb-2">
+                                <div class="col-6">
+                                    <select class="form-select form-select-sm" @bind="v.Vorschlagstyp">
+                                        @foreach (Vorschlagstyp vt in Enum.GetValues<Vorschlagstyp>())
+                                        {
+                                            <option value="@vt">@vt</option>
+                                        }
+                                    </select>
+                                </div>
+                                <div class="col-6">
+                                    <input class="form-control form-control-sm" @bind="v.EmpfohleneTechnologie" placeholder="Technologie" />
+                                </div>
+                            </div>
+                            <div class="d-flex gap-2">
+                                <small class="text-muted"><i class="bi bi-clock me-1"></i>@v.AufwandTage Tage</small>
+                                <small class="text-muted"><i class="bi bi-bar-chart me-1"></i>@v.Komplexitaet</small>
+                            </div>
+                            <small class="text-muted d-block mt-1">@v.Begruendung</small>
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
+    </div>
+
+    @if (draft.Risiken.Any())
+    {
+        <div class="card mb-3">
+            <div class="card-header"><i class="bi bi-exclamation-triangle me-2"></i>Risiken</div>
+            <div class="card-body">
+                <ul class="mb-0">
+                    @foreach (var r in draft.Risiken)
+                    {
+                        <li class="text-muted">@r</li>
+                    }
+                </ul>
+            </div>
+        </div>
+    }
+
+    @if (!string.IsNullOrEmpty(errorMessage))
+    {
+        <div class="alert alert-danger"><i class="bi bi-exclamation-triangle me-2"></i>@errorMessage</div>
+    }
+
+    <div class="d-flex justify-content-between gap-2">
+        <button class="btn btn-secondary" @onclick="Reset">
+            <i class="bi bi-arrow-counterclockwise me-1"></i>Neu starten
+        </button>
+        <div class="d-flex gap-2">
+            <button class="btn btn-outline-primary" @onclick="Reset">Abbrechen</button>
+            <button class="btn btn-success" @onclick="PersistDraft" disabled="@isSaving">
+                @if (isSaving)
+                {
+                    <span class="spinner-border spinner-border-sm me-2"></span>
+                    <span>Speichere...</span>
+                }
+                else
+                {
+                    <i class="bi bi-check-lg me-1"></i>
+                    <span>Projekt erstellen</span>
+                }
+            </button>
+        </div>
+    </div>
+}
+
+<Toast @bind-IsVisible="showToast" Title="@toastTitle" Message="@toastMessage" Level="@toastLevel" />
+
+@code {
+    private record Example(string Label, string Text);
+
+    private static readonly Example[] Examples =
+    {
+        new("Rechnungseingang", "Wir bekommen jeden Tag 20-30 Papier-Rechnungen per Post und geben sie manuell in Excel ein, bevor die Buchhaltung sie bucht."),
+        new("Urlaubsantrag", "Urlaubsantr&auml;ge laufen heute per Papierformular; der Vorgesetzte unterschreibt und HR pflegt die Abwesenheit manuell in eine Liste."),
+        new("Onboarding", "Beim Eintritt eines neuen Mitarbeiters werden manuell Tickets an IT, Facility und HR verschickt; das dauert oft 2 Wochen."),
+        new("Spesen", "Aussendienstmitarbeiter reichen Papierquittungen ein; eine Assistenz tippt Beleg f&uuml;r Beleg in Excel ab."),
+        new("Kundenanfragen", "Anfragen kommen per E-Mail und Telefon; Vertrieb pflegt sie manuell in einer Excel-Liste, was oft zu doppelter Bearbeitung f&uuml;hrt."),
+    };
+
+    private string input = string.Empty;
+    private string verantwortlicher = string.Empty;
+    private ProjectDraft? draft;
+    private bool isAnalyzing;
+    private bool isSaving;
+    private string errorMessage = string.Empty;
+
+    private bool showToast;
+    private string toastTitle = string.Empty;
+    private string toastMessage = string.Empty;
+    private ToastLevel toastLevel = ToastLevel.Info;
+
+    private void UseExample(Example ex)
+    {
+        input = ex.Text;
+    }
+
+    private async Task Analyze()
+    {
+        errorMessage = string.Empty;
+        if (string.IsNullOrWhiteSpace(input)) return;
+        isAnalyzing = true;
+        try
+        {
+            draft = await ScannerService.AnalyzeAsync(input, verantwortlicher);
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Analyse fehlgeschlagen: {ex.Message}";
+        }
+        finally
+        {
+            isAnalyzing = false;
+        }
+    }
+
+    private void Reset()
+    {
+        draft = null;
+        errorMessage = string.Empty;
+    }
+
+    private void AddAnforderung() => draft?.Anforderungen.Add(new AnforderungDraft { Titel = "Neue Anforderung" });
+    private void AddVorschlag() => draft?.Vorschlaege.Add(new VorschlagDraft { Titel = "Neuer Vorschlag", Vorschlagstyp = Vorschlagstyp.Eigenentwicklung });
+
+    private async Task PersistDraft()
+    {
+        if (draft == null) return;
+        isSaving = true;
+        errorMessage = string.Empty;
+        try
+        {
+            var userId = await GetUserIdAsync();
+            var projekt = new Projekt
+            {
+                Titel = draft.Titel,
+                Beschreibung = draft.Beschreibung,
+                Status = draft.Status,
+                Technologie = draft.Technologie,
+                Verantwortlicher = string.IsNullOrWhiteSpace(draft.Verantwortlicher) ? "IT-Team" : draft.Verantwortlicher,
+            };
+            projekt.Benutzeranforderungen = draft.Anforderungen.Select(a => new Benutzeranforderung
+            {
+                Titel = a.Titel,
+                Beschreibung = a.Beschreibung,
+                Prioritaet = a.Prioritaet,
+                Status = AnforderungsStatus.Offen,
+                Ersteller = projekt.Verantwortlicher
+            }).ToList();
+            projekt.Vorschlaege = draft.Vorschlaege.Select(v => new DigitalisierungsVorschlag
+            {
+                Titel = v.Titel,
+                Beschreibung = string.IsNullOrWhiteSpace(v.EmpfohleneTechnologie)
+                    ? v.Beschreibung
+                    : $"{v.Beschreibung}\n\nTechnologie: {v.EmpfohleneTechnologie}\nAufwand: {v.AufwandTage} Tage, Komplexitaet: {v.Komplexitaet}",
+                Vorschlagstyp = v.Vorschlagstyp,
+                Begruendung = v.Begruendung
+            }).ToList();
+
+            await ProjektService.CreateProjektAsync(projekt, userId);
+            Navigation.NavigateTo("/projekte");
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Speichern fehlgeschlagen: {ex.Message}";
+        }
+        finally
+        {
+            isSaving = false;
+        }
+    }
+
+    private async Task<string> GetUserIdAsync()
+    {
+        var authState = await AuthStateProvider.GetAuthenticationStateAsync();
+        return authState.User.FindFirstValue(ClaimTypes.NameIdentifier) ?? "";
+    }
+}

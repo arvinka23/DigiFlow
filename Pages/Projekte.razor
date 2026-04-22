@@ -13,9 +13,14 @@
 
 <div class="d-flex justify-content-between align-items-center mb-4">
     <h1><i class="bi bi-kanban me-2"></i>Projektverwaltung</h1>
-    <button class="btn btn-success" @onclick="ShowCreateModal">
-        <i class="bi bi-plus-lg me-1"></i> Neues Projekt
-    </button>
+    <div class="d-flex gap-2">
+        <a class="btn btn-outline-primary" href="/scanner">
+            <i class="bi bi-stars me-1"></i> Mit Scanner erstellen
+        </a>
+        <button class="btn btn-success" @onclick="ShowCreateModal">
+            <i class="bi bi-plus-lg me-1"></i> Neues Projekt
+        </button>
+    </div>
 </div>
 
 <div class="row g-3 mb-4">
