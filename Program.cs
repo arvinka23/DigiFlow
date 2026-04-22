@@ -8,6 +8,7 @@ using DigitalisierungsManager.Services.Scanner;
 using DigitalisierungsManager.Services.QueryBuilder;
 using DigitalisierungsManager.Services.Health;
 using DigitalisierungsManager.Services.Search;
+using DigitalisierungsManager.Services.Reports;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -68,6 +69,7 @@ builder.Services.AddScoped<IOpportunityScannerService, OpportunityScannerService
 builder.Services.AddSingleton<IQueryBuilderService, QueryBuilderService>();
 builder.Services.AddSingleton<IHealthScoreService, HealthScoreService>();
 builder.Services.AddScoped<ISemanticSearchService, SemanticSearchService>();
+builder.Services.AddScoped<IWeeklyReportService, WeeklyReportService>();
 
 // AI Provider (optional, Default "None" = 0 Kosten, keine externen Calls)
 builder.Services.Configure<AiOptions>(builder.Configuration.GetSection(AiOptions.SectionName));
